@@ -1,0 +1,9 @@
+
+#最大context
+MAX_CONTEXT_WINDOW = 18000
+
+#滑动窗口
+FIRST_WATER_LEVEL = 0.3
+SECOND_WATER_LEVEL = 0.5
+
+MODEL = ""
