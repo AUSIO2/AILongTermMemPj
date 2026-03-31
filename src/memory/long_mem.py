@@ -1,6 +1,6 @@
 from src.agents import MessageDTO, Role
 from src.memory.base_mem import BaseMem
-from constant import *
+from src.memory.constant import *
 import chromadb
 import uuid
 
@@ -8,7 +8,9 @@ class LongMem(BaseMem):
     """长期记忆策略（占位实现，待补充具体逻辑）。"""
     def __init__(self) -> None:
         self.collection_name = f"long_mem"
-        self.client = chromadb.Client()
+        import os
+        os.makedirs("./memorystore", exist_ok=True)
+        self.client = chromadb.PersistentClient(path="./memorystore")
         try:
             self.client.delete_collection(name=self.collection_name)
         except Exception as e:
