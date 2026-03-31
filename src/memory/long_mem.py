@@ -3,6 +3,9 @@ from src.memory.base_mem import BaseMem
 from src.memory.constant import *
 import chromadb
 import uuid
+import logging
+
+logger = logging.getLogger("AILongTermMem")
 
 class LongMem(BaseMem):
     """长期记忆策略（占位实现，待补充具体逻辑）。"""
@@ -33,12 +36,16 @@ class LongMem(BaseMem):
             for doc in docs:
                 msg = MessageDTO.model_validate_json(doc)
                 translated_result.append(msg)
+                
+        if translated_result:
+            logger.info("  [向量搜索] 根据提问 '%s' 检索出 %d 条相关的长期记忆", q, len(translated_result))
+            
         return translated_result
 
     def update_mem(self, q: str, ans: str) -> None:
         """向量数据库的add"""
         user_msg = MessageDTO(role=Role.USER, content=q)
-        assist_msg = MessageDTO(role=Role.USER, content=ans)
+        assist_msg = MessageDTO(role=Role.ASSISTANT, content=ans)
         docs = [
             user_msg.model_dump_json(),
             assist_msg.model_dump_json()

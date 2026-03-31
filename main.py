@@ -92,6 +92,14 @@ def conversation_loop(agent: Agent):
                 logger.error("Agent Error: %s\n", e)
 
 def run():
+    #删库
+    import shutil
+    import os
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    store_path = os.path.join(base_dir, "memorystore")
+    if os.path.exists(store_path):
+        shutil.rmtree(store_path, ignore_errors=True)
+
     agents = init()
     for ag in agents:
         agent_name = ag.mem.__class__.__name__
