@@ -1,4 +1,4 @@
-from src.agents import MessageDTO, Role
+from src.agents.message_dto import MessageDTO, Role
 from src.memory.base_mem import BaseMem
 from src.memory.constant import *
 import chromadb

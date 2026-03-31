@@ -2,11 +2,10 @@ from src.agents.message_dto import MessageDTO,Role
 from src.agents.message_enum import Message
 
 from src.memory.constant import MAX_CONTEXT_WINDOW, FIRST_WATER_LEVEL, SECOND_WATER_LEVEL
-from src.agents.agent import Agent
 from src.memory.no_mem import NoMem
 from src.memory.short_mem import ShortMem
 
-class ShortExtractedMem(ShortMem):
+class ShortMemExtracted(ShortMem):
     """带摘要的短期记忆策略。"""
     def __init__(self):
         super().__init__()
@@ -38,6 +37,7 @@ class ShortExtractedMem(ShortMem):
         )
 
         # 用无记忆的 Agent 做摘要
+        from src.agents.agent import Agent
         agent = Agent(mem_module=NoMem())
         summary = agent.chat(f"{Message.MEMORY_EXTRACT_CONTEXT}\n{conversation_text}")
 

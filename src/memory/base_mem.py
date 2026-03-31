@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from src.agents import message_dto, MessageDTO
+from src.agents.message_dto import MessageDTO
 
 
 class BaseMem(metaclass=ABCMeta):

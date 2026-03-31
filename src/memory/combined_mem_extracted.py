@@ -1,13 +1,13 @@
 from src.agents.message_dto import MessageDTO, Role
 from src.agents.message_enum import Message
 from src.memory.base_mem import BaseMem
-from src.memory.short_mem_extracted import ShortExtractedMem
+from src.memory.short_mem_extracted import ShortMemExtracted
 from src.memory.long_mem import LongMem
 
 class CombinedMemExtracted(BaseMem):
     """带摘要的短期 + 长期记忆组合策略"""
     def __init__(self):
-        self.short_mem = ShortExtractedMem()
+        self.short_mem = ShortMemExtracted()
         self.long_mem = LongMem()
 
     def get_mem(self, q: str) -> list[MessageDTO]:
