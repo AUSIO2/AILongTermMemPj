@@ -15,7 +15,7 @@ class ShortMem(BaseMem):
         self.mem :list[MessageDTO] = []
         self.enc = tiktoken.encoding_for_model(MODEL)
 
-    def get_mem(self, q: str) -> list:
+    def get_mem(self, q: str) -> list[MessageDTO]:
         return self.mem
 
     def update_mem(self, q: str, ans: str) -> None:
