@@ -2,6 +2,7 @@ import src.memory as memory
 from src.agents import Agent, MessageDTO
 
 import os
+import sys
 import logging
 from src.agents.message_enum import Message
 
@@ -14,6 +15,19 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if val is None:
         return default
     return val.strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def _resolve_mode(argv: list[str]) -> str:
+    mode = os.getenv("RUN_MODE", "test").strip().lower()
+    for i, arg in enumerate(argv):
+        if arg == "--mode" and i + 1 < len(argv):
+            mode = argv[i + 1].strip().lower()
+        elif arg.startswith("--mode="):
+            mode = arg.split("=", 1)[1].strip().lower()
+    if mode not in {"test", "chat"}:
+        logger.warning("未知模式 '%s'，将回退到 test", mode)
+        return "test"
+    return mode
 
 def setup_agent_logger(agent_name: str):
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -140,7 +154,29 @@ def conversation_loop(agent: Agent):
             except Exception as e:
                 logger.error("Agent Error: %s\n", e)
 
-def run():
+
+def chat_loop(agent: Agent):
+    print("进入对话模式，输入 exit / quit / q 退出。")
+    while True:
+        try:
+            q_text = input("你: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n已退出对话模式。")
+            break
+        if not q_text:
+            continue
+        if q_text.lower() in {"exit", "quit", "q"}:
+            print("已退出对话模式。")
+            break
+        try:
+            reply = agent.chat(q_text)
+            print(f"Agent: {reply}\n")
+        except Exception as e:
+            logger.error("Agent Error: %s", e)
+            print("Agent: 抱歉，当前请求失败，请查看日志。")
+
+
+def run_test_mode():
     #删库
     import shutil
     import os
@@ -155,6 +191,28 @@ def run():
         setup_agent_logger(agent_name)
         logger.info(" 开始评测策略: %s", agent_name)
         conversation_loop(ag)
+
+
+def run_chat_mode():
+    agents = init()
+    if not agents:
+        logger.error("没有可用的记忆策略，请检查 MEMORY_STRATEGIES 配置")
+        return
+    if len(agents) > 1:
+        logger.warning("chat 模式只使用第一个策略: %s", agents[0].mem.__class__.__name__)
+    ag = agents[0]
+    setup_agent_logger(ag.mem.__class__.__name__)
+    logger.info(" 开始对话模式: %s", ag.mem.__class__.__name__)
+    chat_loop(ag)
+
+
+def run():
+    mode = _resolve_mode(sys.argv[1:])
+    if mode == "chat":
+        run_chat_mode()
+    else:
+        run_test_mode()
+
 
 if __name__ == '__main__':
     run()
