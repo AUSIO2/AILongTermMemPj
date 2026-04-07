@@ -5,7 +5,7 @@ import os
 import tiktoken
 
 from src.memory.constant import MAX_CONTEXT_WINDOW, FIRST_WATER_LEVEL, SECOND_WATER_LEVEL,MODEL
-from src.agents.agent import Agent
+from src.agents.Agent import Agent
 from src.memory.no_mem import NoMem
 
 
