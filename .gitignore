@@ -16,3 +16,5 @@ venv/
 
 # 向量数据库本地存储
 chroma_db/
+/log/
+/memorystore/

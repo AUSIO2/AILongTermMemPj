@@ -1,0 +1,26 @@
+[
+  {
+    "id": "example_test_1",
+    "type": "consistency",
+    "turns": [
+      {
+        "q": "你好，从现在开始你扮演一名医生。"
+      },
+      {
+        "q": "你通常在哪里工作？"
+      }
+    ]
+  },
+  {
+    "id": "example_test_2",
+    "type": "forgetting",
+    "turns": [
+      {
+        "q": "请记住今天是个好日子"
+      }
+    ]
+  }
+]
+//type 指的是这一轮测的是什么指标，"consistency" —— 代表这组测的是 “多轮一致性”
+//"forgetting" —— 代表这组测的是 “信息遗忘率”
+//"pollution" —— 代表这组测的是 “错误记忆污染”
