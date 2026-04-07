@@ -8,6 +8,13 @@ from src.agents.message_enum import Message
 logger = logging.getLogger("AILongTermMem")
 logger.setLevel(logging.INFO)
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "on", "y"}
+
 def setup_agent_logger(agent_name: str):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     log_dir = os.path.join(base_dir, "log")
@@ -29,11 +36,21 @@ def setup_agent_logger(agent_name: str):
     logger.addHandler(console_handler)
 
 def init() -> list[Agent]:
+    selected_strategies = {
+        name.strip()
+        for name in os.getenv("MEMORY_STRATEGIES", "").split(",")
+        if name.strip()
+    }
+
     agents = []
     for name in memory.__all__:
         if name != "BaseMem":
+            if selected_strategies and name not in selected_strategies:
+                continue
             mem_class = getattr(memory, name)
             agents.append(Agent(mem_module = mem_class()))
+    if selected_strategies and not agents:
+        logger.warning("MEMORY_STRATEGIES 未匹配到任何策略: %s", ",".join(sorted(selected_strategies)))
     return agents
 
 def loadtest() -> list[MessageDTO]:
@@ -86,6 +103,8 @@ def loadtest() -> list[MessageDTO]:
     return tests
 
 def conversation_loop(agent: Agent):
+    show_short_mem_logs = _env_bool("LOG_SHORT_MEM_RECORDS", default=True)
+    current_strategy = agent.mem.__class__.__name__
     tests = loadtest()
     if not tests:
         return
@@ -107,7 +126,11 @@ def conversation_loop(agent: Agent):
                 elif m.role.value == "system" and "摘要" in m.content:
                     logger.info("[短期记忆摘要] \n%s", m.content)
                 else:
-                    logger.info("[短期记忆记录] [%s]: %s", m.role.name, m.content)
+                    # 仅长期记忆策略下，非 system 记忆来自向量检索，不应标记为短期记忆
+                    if current_strategy == "LongMem":
+                        logger.info("[长期记忆检索] [%s]: %s", m.role.name, m.content)
+                    elif show_short_mem_logs:
+                        logger.info("[短期记忆记录] [%s]: %s", m.role.name, m.content)
             
             logger.info("[当前用户输入] [USER]: %s", q_text)
             
