@@ -41,16 +41,42 @@ def loadtest() -> list[MessageDTO]:
     from src.agents.message_dto import MessageDTO, Role
     # 获取测试文件的绝对路径
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    # 读取标准的 .json 文件
     test_file = os.path.join(base_dir, "test", "conversation_tests.json")
-    
-    if not os.path.exists(test_file):
-        logger.error(f"找不到测试文件: {test_file}")
-        return []
-        
-    with open(test_file, "r", encoding="utf-8") as f:
-        # 将整个 JSON 数组反序列化为 Python 列表
-        tests = json.load(f)
+    fallback_files = [
+        os.path.join(base_dir, "test", "conversation_tests.json.example2"),
+        os.path.join(base_dir, "test", "conversation_tests.json.example"),
+    ]
+
+    def _read_test_file(file_path: str):
+        with open(file_path, "r", encoding="utf-8") as f:
+            raw_text = f.read()
+        # 允许测试文件为空白字符，并给出更清晰的日志
+        if not raw_text.strip():
+            raise ValueError(f"测试文件为空: {file_path}")
+        return json.loads(raw_text)
+
+    tests = []
+    if os.path.exists(test_file):
+        try:
+            tests = _read_test_file(test_file)
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning("测试文件格式异常，将尝试回退到示例文件: %s", e)
+    else:
+        logger.warning("找不到测试文件，将尝试示例文件: %s", test_file)
+
+    if not tests:
+        for fallback_file in fallback_files:
+            if not os.path.exists(fallback_file):
+                continue
+            try:
+                tests = _read_test_file(fallback_file)
+                logger.info("已回退使用示例测试文件: %s", fallback_file)
+                break
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning("示例测试文件不可用: %s | %s", fallback_file, e)
+        if not tests:
+            logger.error("无法加载任何可用的测试文件")
+            return []
         
     for data in tests:
         for turn in data["turns"]:
