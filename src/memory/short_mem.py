@@ -1,11 +1,9 @@
 from src.memory.base_mem import BaseMem
 from src.agents.message_dto import MessageDTO,Role
 from src.agents.message_enum import Message
-import os
 import tiktoken
 
 from src.memory.constant import MAX_CONTEXT_WINDOW, FIRST_WATER_LEVEL, SECOND_WATER_LEVEL,MODEL
-from src.agents.Agent import Agent
 from src.memory.no_mem import NoMem
 
 
