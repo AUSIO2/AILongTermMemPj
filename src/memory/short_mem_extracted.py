@@ -37,7 +37,7 @@ class ShortMemExtracted(ShortMem):
         )
 
         # 用无记忆的 Agent 做摘要
-        from src.agents.agent import Agent
+        from src.agents.Agent import Agent
         agent = Agent(mem_module=NoMem())
         summary = agent.chat(f"{Message.MEMORY_EXTRACT_CONTEXT}\n{conversation_text}")
 

@@ -8,10 +8,11 @@ version = "0.1.0"
 description = "AI Agent with pluggable long/short-term memory strategies"
 requires-python = ">=3.11"
 dependencies = [
-    "openai>=1.0.0",
     "chromadb>=0.4.0",
+    "openai>=1.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
+    "tiktoken>=0.12.0",
 ]
 
 [project.scripts]

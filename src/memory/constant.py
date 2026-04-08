@@ -9,4 +9,4 @@ SECOND_WATER_LEVEL = 0.5
 MODEL = "gpt-4o"
 
 #长期记忆检索条数
-LONG_MEM_N = 5
+LONG_MEM_N = 3

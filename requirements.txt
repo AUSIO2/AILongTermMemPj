@@ -1,6 +1,6 @@
-# requirements.txt
-openai>=1.0.0
+# Core runtime dependencies
 chromadb>=0.4.0
+openai>=1.0.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 tiktoken>=0.12.0
