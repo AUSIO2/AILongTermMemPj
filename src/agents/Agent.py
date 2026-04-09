@@ -31,7 +31,7 @@ class Agent:
 
     def _build_messages(self, q: str, mem: list[MessageDTO]) -> list[dict]:
         messages: list[dict] = [
-            {"role": "system", "content": Message.SYSTEM_CONTEXT.value}
+            {"role": "system", "content": Message.SYSTEM_PROMPT.value}
         ]
         for item in mem:
             messages.append({"role": item.role.value, "content": item.content})
