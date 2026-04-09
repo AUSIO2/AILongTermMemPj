@@ -10,13 +10,29 @@ from src.memory.constant import LONG_MEM_N
 
 logger = logging.getLogger("AILongTermMem")
 
+# 与 main.py 一致：数据落在「项目根/memorystore」，避免 uvicorn 等工作目录不同读到另一套目录
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+
+def _memorystore_dir() -> str:
+    override = os.getenv("MEMORYSTORE_PATH", "").strip()
+    if override:
+        return os.path.abspath(override)
+    return os.path.join(_PROJECT_ROOT, "memorystore")
+
 
 class LongMem(BaseMem):
     """长期记忆策略：使用向量数据库存储与检索对话记录。"""
 
+    _logged_store: str | None = None
+
     def __init__(self) -> None:
-        os.makedirs("./memorystore", exist_ok=True)
-        self.client = chromadb.PersistentClient(path="./memorystore")
+        store = _memorystore_dir()
+        os.makedirs(store, exist_ok=True)
+        if LongMem._logged_store != store:
+            logger.info("LongMem Chroma 持久化目录: %s", store)
+            LongMem._logged_store = store
+        self.client = chromadb.PersistentClient(path=store)
         self.collection = self.client.get_or_create_collection(name="long_mem")
 
     def get_mem(self, q: str) -> list[MessageDTO]:
