@@ -17,11 +17,7 @@ class LongMem(BaseMem):
     def __init__(self) -> None:
         os.makedirs("./memorystore", exist_ok=True)
         self.client = chromadb.PersistentClient(path="./memorystore")
-        try:
-            self.client.delete_collection(name="long_mem")
-        except Exception:
-            pass
-        self.collection = self.client.create_collection(name="long_mem")
+        self.collection = self.client.get_or_create_collection(name="long_mem")
 
     def get_mem(self, q: str) -> list[MessageDTO]:
         """从长期记忆中检索最相关的消息。"""
@@ -49,3 +45,8 @@ class LongMem(BaseMem):
                 {"role": Role.ASSISTANT.value, "type": "a"},
             ],
         )
+
+    def clear_mem(self) -> None:
+        """清空当前长期记忆集合。"""
+        self.client.delete_collection(name="long_mem")
+        self.collection = self.client.get_or_create_collection(name="long_mem")

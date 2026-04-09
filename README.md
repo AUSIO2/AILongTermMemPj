@@ -62,9 +62,83 @@ run-agent-tests
 ]
 ```
 
+## 🌐 Web 可视化聊天界面
+
+除自动化评测模式外，项目还提供了一套完整的 Web 聊天界面，可在浏览器中与不同记忆策略的 Agent 实时对话。
+
+### 前置依赖
+
+- Python 环境已安装所有依赖（见上方快速启动）
+- [Node.js](https://nodejs.org)（用于运行前端开发服务器）
+- Node 安装后需将其目录（如 `F:\nodejs`）添加到系统 **用户 Path** 环境变量，并重启终端/IDE 生效
+
+### 启动步骤
+
+需要开启**两个终端**分别运行后端和前端。
+
+**终端 1 — 后端 API 服务**（在项目根目录，激活你的 Python 环境后运行）：
+
+```bash
+uvicorn api.app:app --reload --port 8000
+```
+
+启动成功标志：
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000
+INFO:     AI Long-Term Memory API 启动
+```
+
+**终端 2 — 前端开发服务器**（在 `frontend/` 目录）：
+
+```bash
+# 首次运行需先安装依赖
+npm install
+
+# 启动前端
+npm run dev
+```
+
+启动成功标志：
+```
+VITE v5.x.x  ready in xxx ms
+➜  Local:   http://localhost:5173/
+```
+
+打开浏览器访问 **http://localhost:5173** 即可看到聊天界面。
+
+### 安全退出
+
+| 进程 | 退出方式 |
+|------|---------|
+| 后端 uvicorn | 在对应终端按 `Ctrl + C` |
+| 前端 Vite | 在对应终端按 `Ctrl + C` |
+
+> 两个服务相互独立，按任意顺序退出均可，不会影响已存储的数据。
+
+### 界面功能说明
+
+- **左侧栏**：选择记忆策略（`ShortMemExtracted` / `LongMem` / `CombinedMem` 等）→ 点击「新建对话」
+- **右侧区**：消息气泡展示，用户消息蓝色右对齐，AI 回复灰色左对齐
+- **多会话**：可同时建立多个对话，每个会话独立持有自己的记忆实例
+- **输入框**：`Enter` 发送，`Shift + Enter` 换行
+
+---
+
 ## 📁 目录结构
 ```text
 AILongTermMemPj/
+│
+├── api/
+│   ├── app.py             # FastAPI 后端，提供 REST 接口
+│   └── session_manager.py # 会话状态管理（Agent 实例隔离）
+│
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx        # 主聊天界面组件
+│   │   ├── api.js         # 封装后端接口调用
+│   │   └── App.css        # 深色主题样式
+│   ├── package.json
+│   └── vite.config.js     # 代理配置（/api → :8000）
 │
 ├── src/
 │   ├── agents/            # OpenAI 请求通信层、实体(MessageDTO)以及预设 Prompt 定义
@@ -74,9 +148,9 @@ AILongTermMemPj/
 │   └── conversation_tests.json  # 你的评测剧本
 │
 ├── log/                   # （自动生成）每一次跑测时产生的独立策略日志报告
-├── memorystore/           # （自动生成/删除）ChromaDB 持久化向量集合目录（跑前已自动完全互不干扰隔离）
+├── memorystore/           # （自动生成/删除）ChromaDB 持久化向量集合目录
 │
-├── main.py                # 脚本执行主循环
+├── main.py                # 脚本执行主循环（评测模式 & 命令行对话模式）
 ├── pyproject.toml         # 包/环境配置
 └── .env                   # API KEY 密钥
 ```

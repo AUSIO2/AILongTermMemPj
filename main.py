@@ -35,6 +35,16 @@ def _resolve_mode(argv: list[str]) -> str:
     return mode
 
 
+def _resolve_test_dataset(argv: list[str]) -> str:
+    dataset = "conversation_tests.json"
+    for i, arg in enumerate(argv):
+        if arg == "--test-file" and i + 1 < len(argv):
+            dataset = argv[i + 1].strip()
+        elif arg.startswith("--test-file="):
+            dataset = arg.split("=", 1)[1].strip()
+    return dataset or "conversation_tests.json"
+
+
 def setup_agent_logger(agent_name: str) -> None:
     log_dir = os.path.join(_BASE_DIR, "log")
     os.makedirs(log_dir, exist_ok=True)
@@ -84,48 +94,33 @@ def _read_test_file(file_path: str) -> list:
     return json.loads(raw_text)
 
 
-def loadtest() -> list:
-    test_file = os.path.join(_BASE_DIR, "test", "conversation_tests.json")
-    fallback_files = [
-        os.path.join(_BASE_DIR, "test", "conversation_tests.json.example2"),
-        os.path.join(_BASE_DIR, "test", "conversation_tests.json.example"),
-    ]
+def loadtest(test_dataset: str = "conversation_tests.json") -> list:
+    test_file = test_dataset
+    if not os.path.isabs(test_dataset):
+        test_file = os.path.join(_BASE_DIR, "test", test_dataset)
 
-    tests: list = []
-    if os.path.exists(test_file):
-        try:
-            tests = _read_test_file(test_file)
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning("测试文件格式异常，将尝试回退到示例文件: %s", e)
-    else:
-        logger.warning("找不到测试文件，将尝试示例文件: %s", test_file)
+    if not os.path.exists(test_file):
+        logger.error("找不到测试文件: %s", test_file)
+        return []
 
-    if not tests:
-        for fallback_file in fallback_files:
-            if not os.path.exists(fallback_file):
-                continue
-            try:
-                tests = _read_test_file(fallback_file)
-                logger.info("已回退使用示例测试文件: %s", fallback_file)
-                break
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning("示例测试文件不可用: %s | %s", fallback_file, e)
-        if not tests:
-            logger.error("无法加载任何可用的测试文件")
-            return []
+    try:
+        tests: list = _read_test_file(test_file)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error("测试文件格式异常: %s | %s", test_file, e)
+        return []
 
     for data in tests:
         for turn in data["turns"]:
             turn["q_dto"] = MessageDTO(role=Role.USER, content=turn["q"])
 
-    logger.info("成功加载了 %d 组测试数据", len(tests))
+    logger.info("成功加载了 %d 组测试数据 | 文件: %s", len(tests), test_file)
     return tests
 
 
-def conversation_loop(agent: Agent) -> None:
+def conversation_loop(agent: Agent, test_dataset: str = "conversation_tests.json") -> None:
     show_short_mem_logs = _env_bool("LOG_SHORT_MEM_RECORDS", default=True)
     current_strategy = agent.mem.__class__.__name__
-    tests = loadtest()
+    tests = loadtest(test_dataset)
     if not tests:
         return
 
@@ -178,7 +173,7 @@ def chat_loop(agent: Agent) -> None:
             print("Agent: 抱歉，当前请求失败，请查看日志。")
 
 
-def run_test_mode() -> None:
+def run_test_mode(test_dataset: str = "conversation_tests.json") -> None:
     store_path = os.path.join(_BASE_DIR, "memorystore")
     if os.path.exists(store_path):
         shutil.rmtree(store_path, ignore_errors=True)
@@ -187,7 +182,7 @@ def run_test_mode() -> None:
         agent_name = ag.mem.__class__.__name__
         setup_agent_logger(agent_name)
         logger.info(" 开始评测策略: %s", agent_name)
-        conversation_loop(ag)
+        conversation_loop(ag, test_dataset)
 
 
 def run_chat_mode() -> None:
@@ -204,11 +199,12 @@ def run_chat_mode() -> None:
 
 
 def run() -> None:
-    mode = _resolve_mode(sys.argv[1:])
+    argv = sys.argv[1:]
+    mode = _resolve_mode(argv)
     if mode == "chat":
         run_chat_mode()
     else:
-        run_test_mode()
+        run_test_mode(_resolve_test_dataset(argv))
 
 
 if __name__ == "__main__":
