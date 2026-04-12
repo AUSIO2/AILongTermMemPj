@@ -4,6 +4,7 @@ import {
   createSession,
   sendMessage,
   deleteSession,
+  getHistory,
 } from "./api";
 import "./App.css";
 
@@ -44,7 +45,8 @@ export default function App() {
   const [selectedStrategy, setSelectedStrategy] = useState("");
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const [messages, setMessages] = useState([]);
+  /** 按会话 id 保存消息，切换/新建会话时互不覆盖 */
+  const [messagesBySession, setMessagesBySession] = useState({});
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -61,6 +63,11 @@ export default function App() {
       .catch(() => setError("无法连接后端，请先启动 uvicorn api.app:app --reload"));
   }, []);
 
+  const messages =
+    activeSessionId && messagesBySession[activeSessionId] != null
+      ? messagesBySession[activeSessionId]
+      : [];
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
@@ -72,20 +79,35 @@ export default function App() {
       const { session_id } = await createSession(selectedStrategy);
       const label = `${selectedStrategy} #${sessionCounter++}`;
       setSessions((prev) => [...prev, { id: session_id, label, strategy: selectedStrategy }]);
+      setMessagesBySession((prev) => ({ ...prev, [session_id]: [] }));
       setActiveSessionId(session_id);
-      setMessages([]);
       inputRef.current?.focus();
     } catch (e) {
       setError(e.message);
     }
   }, [selectedStrategy]);
 
-  const handleSelectSession = useCallback((id) => {
-    const session = sessions.find((s) => s.id === id);
-    if (!session) return;
-    setActiveSessionId(id);
-    setError("");
-  }, [sessions]);
+  const handleSelectSession = useCallback(
+    async (id) => {
+      const session = sessions.find((s) => s.id === id);
+      if (!session) return;
+      setActiveSessionId(id);
+      setError("");
+      try {
+        const hist = await getHistory(id);
+        setMessagesBySession((prev) => {
+          if (prev[id] !== undefined && prev[id].length > 0) return prev;
+          return { ...prev, [id]: hist };
+        });
+      } catch {
+        setMessagesBySession((prev) => {
+          if (prev[id] !== undefined) return prev;
+          return { ...prev, [id]: [] };
+        });
+      }
+    },
+    [sessions]
+  );
 
   const handleDeleteSession = useCallback(
     async (id, e) => {
@@ -94,9 +116,13 @@ export default function App() {
         await deleteSession(id);
       } catch {}
       setSessions((prev) => prev.filter((s) => s.id !== id));
+      setMessagesBySession((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       if (activeSessionId === id) {
         setActiveSessionId(null);
-        setMessages([]);
       }
     },
     [activeSessionId]
@@ -104,20 +130,30 @@ export default function App() {
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || !activeSessionId || loading) return;
+    const sid = activeSessionId;
+    if (!text || !sid || loading) return;
     setInput("");
     setError("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessagesBySession((prev) => ({
+      ...prev,
+      [sid]: [...(prev[sid] ?? []), { role: "user", content: text }],
+    }));
     setLoading(true);
     try {
-      const { reply } = await sendMessage(activeSessionId, text);
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      const { reply } = await sendMessage(sid, text);
+      setMessagesBySession((prev) => ({
+        ...prev,
+        [sid]: [...(prev[sid] ?? []), { role: "assistant", content: reply }],
+      }));
     } catch (e) {
       setError(e.message);
-      setMessages((prev) => [
+      setMessagesBySession((prev) => ({
         ...prev,
-        { role: "assistant", content: `[错误] ${e.message}` },
-      ]);
+        [sid]: [
+          ...(prev[sid] ?? []),
+          { role: "assistant", content: `[错误] ${e.message}` },
+        ],
+      }));
     } finally {
       setLoading(false);
     }

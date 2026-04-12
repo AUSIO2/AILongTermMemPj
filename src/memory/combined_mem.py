@@ -6,9 +6,9 @@ from src.agents.message_enum import Message
 
 class CombinedMem(BaseMem):
     """短期 + 长期记忆组合策略"""
-    def __init__(self):
+    def __init__(self, session_id: str | None = None):
         self.short_mem = ShortMem()
-        self.long_mem = LongMem()
+        self.long_mem = LongMem(session_id=session_id)
 
     def get_mem(self, q: str) -> list[MessageDTO]:
         long_memessages = self.long_mem.get_mem(q)
