@@ -122,6 +122,16 @@ VITE v5.x.x  ready in xxx ms
 - **多会话**：可同时建立多个对话，每个会话独立持有自己的记忆实例
 - **输入框**：`Enter` 发送，`Shift + Enter` 换行
 
+### 长期记忆的删除
+
+```bash
+# 删除所有记录 
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/memory/long/clear" -Method POST
+# 获取记忆目录 
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/sessions/<your session_id>/memory/long" -Method Get
+# 删除单条记录
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/sessions/<你的session_id>/memory/long/<item_id>" -Method Delete
+```
 ---
 
 ## 📁 目录结构

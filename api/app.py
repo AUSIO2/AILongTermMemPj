@@ -51,6 +51,13 @@ class SessionInfo(BaseModel):
     strategy: str
 
 
+class LongMemItem(BaseModel):
+    id: str
+    role: str | None = None
+    type: str | None = None
+    content: str
+
+
 # ---------- 路由 ----------
 
 @app.get("/api/strategies", response_model=list[str])
@@ -98,6 +105,30 @@ def delete_session(session_id: str):
     if not deleted:
         raise HTTPException(status_code=404, detail=f"会话不存在: {session_id}")
     return {"detail": "会话已删除"}
+
+
+@app.get("/api/sessions/{session_id}/memory/long", response_model=list[LongMemItem])
+def list_long_mem_items(session_id: str):
+    """列出该 Web 会话在 Chroma 中的长期记忆条目（每条为一条用户或助手消息向量）。"""
+    try:
+        items = sm.list_long_mem_items(session_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return [LongMemItem(**x) for x in items]
+
+
+@app.delete("/api/sessions/{session_id}/memory/long/{item_id}")
+def delete_long_mem_item(session_id: str, item_id: str):
+    """按 Chroma 文档 id 删除一条长期记忆（仅能删属于该 session_id 的条目）。"""
+    try:
+        sm.delete_long_mem_item(session_id, item_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"detail": "长期记忆条目已删除", "id": item_id}
 
 
 @app.post("/api/memory/long/clear")
