@@ -3,11 +3,15 @@ import os
 import shutil
 import sys
 import logging
+from typing import Any
 
 import src.memory as memory
 from src.agents import Agent, MessageDTO
 from src.agents.message_dto import Role
 from src.agents.message_enum import Message
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 logger = logging.getLogger("AILongTermMem")
 logger.setLevel(logging.INFO)
@@ -197,6 +201,231 @@ def run_chat_mode() -> None:
     logger.info(" 开始对话模式: %s", ag.mem.__class__.__name__)
     chat_loop(ag)
 
+def evaluation_IO(question: str, answer: str, expected: str) -> int:
+    """
+    return:
+        1 = correct
+        0 = incorrect
+    """
+
+    prompt = f"""
+You are a strict evaluator.
+
+Task:
+Determine whether the model's answer matches the expected meaning.
+
+Rules:
+- Ignore wording differences
+- Focus on semantic equivalence
+- If same meaning → 1
+- Otherwise → 0
+
+Question:
+{question}
+
+Expected answer:
+{expected}
+
+Model answer:
+{answer}
+
+Return ONLY 1 or 0.
+"""
+    response = client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    result = response.choices[0].message.content.strip()
+
+    return 1 if "1" in result else 0
+
+def evaluation_forgetting(question: str, answer: str, expectation: str) -> float:
+    """
+    expectation: 多个 memory points（可以是 list 或 string）
+    """
+
+    prompt = f"""
+You are an evaluator for memory recall.
+
+Task:
+Check how many memory points in EXPECTATION are correctly reflected in the ANSWER.
+
+Rules:
+- Each memory point is counted separately
+- A point is correct if meaning is preserved in answer
+- Return format MUST be:
+  correct_count / total_count
+
+Question:
+{question}
+
+Expected memory points:
+{expectation}
+
+Model answer:
+{answer}
+
+Return ONLY the fraction (e.g. 2/3).
+"""
+
+    response = client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    return response.choices[0].message.content.strip()
+
+
+def load_data_new(path: str) -> list[dict[str, Any]]:
+    """
+    读取新的 JSON 数据格式（list 或单个 dict 都兼容）
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if isinstance(data, dict):
+        return [data]
+    return data
+
+def answer_evaluation(conv_type: str, evaluations: list[dict], answers: dict) -> float:
+    """
+    evaluations: 所有 role == evaluation 的节点
+    answers: {question: answer}
+    """
+
+    if conv_type == "consistency":
+        scores = []
+        for ev in evaluations:
+            q = ev["q"]
+            expected = ev["expected"]
+            ans = answers.get(q, "")
+            scores.append(evaluation_IO(q, ans, expected))
+
+        return sum(scores) / len(scores) if scores else 0.0
+
+    elif conv_type == "forgetting":
+        # 只取最后一个 evaluation
+        ev = evaluations[-1]
+        q = ev["q"]
+        expected = ev["expected"]
+        ans = answers.get(q, "")
+        return evaluation_forgetting(ans, expected)
+
+    else:
+        raise ValueError(f"Unknown type: {conv_type}")
+
+def conversation_loop(agent, test_dataset: str = "conversation_tests.json") -> None:
+    tests = load_data_new(test_dataset)
+    if not tests:
+        return
+
+    for data in tests:
+        conv_id = data.get("id")
+        conv_type = data.get("type")
+
+        logger.info("--- 运行测试组: %s (类型: %s) ---", conv_id, conv_type)
+
+        # 每组对话重置 memory
+        agent.mem = agent.mem.__class__()
+
+        turns = data.get("turns", [])
+
+        answers: dict[str, str] = {}
+        evaluation_nodes: list[dict] = []
+
+        # =========================
+        # 1. 逐轮对话执行
+        # =========================
+        for turn in turns:
+            role = turn.get("role")
+            q_text = turn.get("q", "")
+
+            # evaluation 不进入对话，只记录
+            if role == "evaluation":
+                evaluation_nodes.append(turn)
+                continue
+
+            logger.info("========== [准备发送的新一轮请求] ==========")
+            logger.info("[Agent 系统设定] %s", Message.SYSTEM_CONTEXT.value)
+
+            # memory log（沿用你的风格）
+            for m in agent.mem.get_mem(q_text):
+                if m.role.value == "system" and "长期记忆" in m.content:
+                    logger.info("[长期记忆注入] \n%s", m.content)
+
+                elif m.role.value == "system" and "摘要" in m.content:
+                    logger.info("[短期记忆摘要] \n%s", m.content)
+
+                elif "LongMem" in agent.mem.__class__.__name__:
+                    logger.info("[长期记忆检索] [%s]: %s", m.role.name, m.content)
+
+                else:
+                    logger.info("[短期记忆记录] [%s]: %s", m.role.name, m.content)
+
+            logger.info("[当前用户输入] [USER]: %s", q_text)
+
+            try:
+                reply = agent.chat(q_text)
+                answers[q_text] = reply
+                logger.info("Agent回复: %s\n", reply)
+
+            except Exception as e:
+                logger.error("Agent Error: %s\n", e)
+
+        # =========================
+        # 2. evaluation 阶段
+        # =========================
+        logger.info("========== [开始评测阶段] ==========")
+
+        score = None
+
+        if conv_type == "consistency":
+            scores = []
+
+            for ev in evaluation_nodes:
+                q = ev["q"]
+                expected = ev["expected"]
+
+                ans = answers.get(q, "")
+                s = evaluation_IO(q, ans, expected)
+
+                scores.append(s)
+
+                logger.info(
+                    "[CONSISTENCY评测] Q: %s | expected: %s | score: %s",
+                    q, expected, s
+                )
+
+            score = sum(scores) / len(scores) if scores else 0.0
+
+        elif conv_type == "forgetting":
+            if not evaluation_nodes:
+                score = 0.0
+            else:
+                ev = evaluation_nodes[-1]
+                q = ev["q"]
+                expected = ev["expected"]
+
+                ans = answers.get(q, "")
+                score = evaluation_forgetting(ans, expected)
+
+                logger.info(
+                    "[FORGETTING评测] Q: %s | expected: %s | score: %s",
+                    q, expected, score
+                )
+
+        else:
+            logger.warning("未知类型: %s", conv_type)
+            score = 0.0
+
+        # =========================
+        # 3. 最终结果输出
+        # =========================
+        logger.info(
+            "========== [测试组结束] id=%s | type=%s | score=%.4f ==========\n",
+            conv_id, conv_type, score
+        )
 
 def run() -> None:
     argv = sys.argv[1:]
