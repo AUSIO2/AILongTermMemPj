@@ -315,7 +315,7 @@ def answer_evaluation(conv_type: str, evaluations: list[dict], answers: dict) ->
     else:
         raise ValueError(f"Unknown type: {conv_type}")
 
-def conversation_loop(agent, test_dataset: str = "conversation_tests.json") -> None:
+def evaluation_loop(agent, test_dataset: str = "conversation_tests.json") -> None:
     tests = load_data_new(test_dataset)
     if not tests:
         return
